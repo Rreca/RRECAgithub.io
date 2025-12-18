@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Listas App (Compatible Antigua)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Listas App</h1>
+  </header>
+  
+  <div class="controles">
+    <button onclick="exportarJSON()">Exportar a JSON</button>
+    <button onclick="document.getElementById('importar').click()">Importar JSON</button>
+    <input type="file" id="importar" accept=".json" style="display:none" onchange="importarJSON(this.files[0])">
+  </div>
+  
+  <div id="grupos-container">
+    <!-- Se genera con JavaScript -->
+  </div>
+  
+  <script src="script.js"></script>
+</body>
+</html>
