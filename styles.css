@@ -391,4 +391,64 @@ body.hide-quick .quick-edit {
     border-left: none;
   }
 }
+/* ===== DETALLE DEL NUDO (panel) – FIX MOBILE ===== */
+#knot-detail {
+  position: fixed;
+  inset: 0;                 /* top/right/bottom/left: 0 */
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;           /* correcto en móviles modernos */
+  background: #fff;
+  padding: 16px;
+  padding-top: 52px;        /* espacio para la X */
+  overflow: hidden;         /* el scroll va adentro */
+  z-index: 2000;
+  box-sizing: border-box;
+  border-left: none;
+  border-radius: 14px;
+}
+
+/* Contenido scrolleable */
+#knot-detail-content {
+  height: calc(100dvh - 52px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 6px; /* evita que el scrollbar tape texto */
+  box-sizing: border-box;
+}
+
+/* Botón cerrar fijo, siempre visible */
+#knot-detail-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+/* Desktop: volver al panel lateral */
+@media (min-width: 769px) {
+  #knot-detail {
+    inset: auto;
+    right: 0;
+    top: 0;
+    width: 320px;
+    height: 100vh;
+    height: 100dvh;
+    border-left: 1px solid #ddd;
+    border-radius: 0;
+  }
+
+  #knot-detail-content {
+    height: calc(100dvh - 52px);
+  }
+}
 
