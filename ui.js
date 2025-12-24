@@ -370,6 +370,7 @@ function showKnotDetail(id) {
   const score = priorityScore(knot);
 
   const detail = document.getElementById('knot-detail');
+  const content = document.getElementById('knot-detail-content');
 
   let html =
     `<h3>${escapeHTML(knot.title)}</h3>` +
@@ -390,8 +391,10 @@ function showKnotDetail(id) {
     `<div class="hint"><b>Actualizado:</b> ${escapeHTML(formatTimeAgo(knot.updatedAt))}</div>` +
     `<div class="hint"><b>Último toque:</b> ${escapeHTML(formatTimeAgo(knot.lastTouchedAt))}</div>`;
 
-  detail.innerHTML = html;
-  detail.style.display = 'block';
+ 
+  
+content.innerHTML = html;
+detail.style.display = 'block';
 }
 
 /***********************
@@ -1098,3 +1101,11 @@ function showAfter5MinModal(knotId) {
     handleDone(knotId);
   };
 }
+document.addEventListener('DOMContentLoaded', function () {
+  const closeBtn = document.getElementById('knot-detail-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function () {
+      document.getElementById('knot-detail').style.display = 'none';
+    });
+  }
+});
