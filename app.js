@@ -90,9 +90,33 @@ function showSection(sectionId) {
   if (detail) detail.style.display = 'none';
 }
 
+function showSoftNudgeChip(knotId, days) {
+  var chip = document.getElementById('timer-chip');
+  if (!chip) return;
+
+  var knot = getKnotById(knotId);
+  var title = knot ? knot.title : 'Nudo';
+
+  chip.style.display = 'inline-block';
+  chip.className = 'badge doing'; // reutiliza estilo
+  chip.style.cursor = 'pointer';
+  chip.textContent = `🔁 Seguí 5 min · ${title} · evitado ${days}d`;
+
+  // Click: abre el foco 5 min (sin modal extra)
+  chip.onclick = function () {
+    try {
+      if (typeof startFiveMin === 'function') startFiveMin(knotId);
+      if (typeof showFocus5MinModal === 'function') showFocus5MinModal(knotId);
+    } catch (_) {}
+  };
+}
+
 function checkNudgeOnLoad() {
   var knots = getKnots();
   var now = Date.now();
+
+  // Si ya hay DOING, no interrumpas: solo chip suave
+  var doing = knots.find(function (k) { return k.status === 'DOING'; });
 
   // elegimos el UNLOCKABLE más evitado (más viejo)
   var staleUnlockables = knots
@@ -107,7 +131,14 @@ function checkNudgeOnLoad() {
   var lastTouch = k.lastTouchedAt || k.createdAt || now;
   var days = Math.max(1, Math.floor((now - lastTouch) / (24 * 60 * 60 * 1000)));
 
-  // helpers defensivos si ui.js no cargó todavía
+  // si hay DOING -> chip suave y chau
+  if (doing) {
+    showSoftNudgeChip(k.id, days);
+    logEvent('NUDGE_SHOWN', { reason: 'UNLOCKABLE_STALE_48H_SOFT_CHIP', knotId: k.id });
+    return;
+  }
+
+  // === Si NO hay DOING: modal con referencia + CTAs ===
   function safeEscape(s) {
     try { return (typeof escapeHTML === 'function') ? escapeHTML(s) : String(s); }
     catch (_) { return String(s); }
@@ -132,70 +163,55 @@ function checkNudgeOnLoad() {
   var score = safePriorityScore(k);
   var hint = (score <= -2) ? 'Sugerencia: DIVIDIR' : (score >= 3 ? 'Sugerencia: HACÉLO YA' : 'Sugerencia: 5 minutos');
 
-  // Modal con referencia + CTAs
   showModal(
     '<h3>Recordatorio</h3>' +
     '<div class="notice">' +
-      'Tu cerebro lo evitó <b>' + days + '</b> día(s).Elegí 1 acción.<br/>' +
+      'Tu cerebro lo evitó hace <b>' + days + '</b> día(s). Elegí 1 acción.<br/>' +
       '<b>' + safeEscape(k.title || 'Nudo') + '</b><br/>' +
       '<span class="hint">Motivo: ' + safeEscape(safeReason(k)) + ' · Último toque: ' + safeEscape(safeTimeAgo(lastTouch)) + '</span><br/>' +
+      (k.nextStep ? ('<div class="hint">Próximo paso: <b>' + safeEscape(k.nextStep) + '</b></div>') : '') +
       safeScoreBadge(score) + ' <span class="kbd">' + safeEscape(hint) + '</span>' +
     '</div>' +
     '<div class="row" style="margin-top:10px;">' +
       '<button id="nudge-view" class="btn">Ver</button>' +
       '<button id="nudge-5" class="btn btn-primary">⏱ Hacer 5 min</button>' +
       '<button id="nudge-split" class="btn">🧩 Dividir</button>' +
-      '<button id="nudge-someday" class="btn">Mandar a ALGÚN DÍA</button>' + (k.nextStep ? ('<div class="hint">Próximo paso: <b>' + safeEscape(k.nextStep) + '</b></div>') : '')
-
+      '<button id="nudge-someday" class="btn">Mandar a ALGÚN DÍA</button>' +
     '</div>',
     { showClose: true }
   );
 
-  // wiring
-  var btnView = document.getElementById('nudge-view');
-  if (btnView) btnView.onclick = function () {
+  document.getElementById('nudge-view').onclick = function () {
     hideModal();
     showSection('section-today');
     renderToday();
     if (typeof showKnotDetail === 'function') showKnotDetail(k.id);
   };
 
-  var btn5 = document.getElementById('nudge-5');
-  if (btn5) btn5.onclick = function () {
+  document.getElementById('nudge-5').onclick = function () {
     hideModal();
-    try {
-      // Si no hay DOING, lo pasamos a DOING
-      if (k.status !== 'DOING') {
-        // puede fallar si ya hay DOING; en ese caso, igual arrancamos 5min del DOING actual
-        transitionToDoing(k.id);
-      }
-    } catch (_) {}
-
+    try { transitionToDoing(k.id); } catch (_) {}
     renderToday();
-
-    // arranca timer + modal foco si existen
     if (typeof startFiveMin === 'function') startFiveMin(k.id);
     if (typeof showFocus5MinModal === 'function') showFocus5MinModal(k.id);
   };
 
-  var btnSplit = document.getElementById('nudge-split');
-  if (btnSplit) btnSplit.onclick = function () {
+  document.getElementById('nudge-split').onclick = function () {
     hideModal();
     showSection('section-today');
     renderToday();
     if (typeof showSplitKnotModal === 'function') showSplitKnotModal(k.id);
   };
 
-  var btnSomeday = document.getElementById('nudge-someday');
-  if (btnSomeday) btnSomeday.onclick = function () {
+  document.getElementById('nudge-someday').onclick = function () {
     hideModal();
     transitionToSomeday(k.id);
     renderToday();
   };
 
-  // log
   logEvent('NUDGE_SHOWN', { reason: 'UNLOCKABLE_STALE_48H', knotId: k.id });
 }
+
 
 
 function handleCaptureClick() {
