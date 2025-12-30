@@ -93,21 +93,110 @@ function showSection(sectionId) {
 function checkNudgeOnLoad() {
   var knots = getKnots();
   var now = Date.now();
-  var staleUnlockables = knots.filter(function (k) {
-    return k.status === 'UNLOCKABLE' && (now - (k.lastTouchedAt || k.createdAt || now)) > (48 * 60 * 60 * 1000);
-  });
 
-  if (staleUnlockables.length > 0) {
-    var knotId = staleUnlockables[0].id;
-    var days = Math.floor((now - staleUnlockables[0].lastTouchedAt) / (24 * 60 * 60 * 1000));
-    showModal(
-      '<h3>Recordatorio</h3>' +
-      '<div class="notice">Evitado hace <b>' + days + '</b> día(s). Hacelo 5 min, dividilo, o mandalo a ALGÚN DÍA.</div>',
-      { showClose: true }
-    );
-    logEvent('NUDGE_SHOWN', { reason: 'UNLOCKABLE_STALE_48H', knotId: knotId });
+  // elegimos el UNLOCKABLE más evitado (más viejo)
+  var staleUnlockables = knots
+    .filter(function (k) { return k.status === 'UNLOCKABLE'; })
+    .sort(function (a, b) {
+      return (a.lastTouchedAt || a.createdAt || now) - (b.lastTouchedAt || b.createdAt || now);
+    });
+
+  if (staleUnlockables.length === 0) return;
+
+  var k = staleUnlockables[0];
+  var lastTouch = k.lastTouchedAt || k.createdAt || now;
+  var days = Math.max(1, Math.floor((now - lastTouch) / (24 * 60 * 60 * 1000)));
+
+  // helpers defensivos si ui.js no cargó todavía
+  function safeEscape(s) {
+    try { return (typeof escapeHTML === 'function') ? escapeHTML(s) : String(s); }
+    catch (_) { return String(s); }
   }
+  function safeTimeAgo(ts) {
+    try { return (typeof formatTimeAgo === 'function') ? formatTimeAgo(ts) : (days + ' día(s) atrás'); }
+    catch (_) { return (days + ' día(s) atrás'); }
+  }
+  function safePriorityScore(knot) {
+    try { return (typeof priorityScore === 'function') ? priorityScore(knot) : ((knot.impact || 3) - (knot.weight || 3)); }
+    catch (_) { return ((knot.impact || 3) - (knot.weight || 3)); }
+  }
+  function safeScoreBadge(score) {
+    try { return (typeof scoreBadge === 'function') ? scoreBadge(score) : ''; }
+    catch (_) { return ''; }
+  }
+  function safeReason(knot) {
+    try { return (typeof reasonToEs === 'function') ? reasonToEs(knot.blockReason) : (knot.blockReason || ''); }
+    catch (_) { return (knot.blockReason || ''); }
+  }
+
+  var score = safePriorityScore(k);
+  var hint = (score <= -2) ? 'Sugerencia: DIVIDIR' : (score >= 3 ? 'Sugerencia: HACÉLO YA' : 'Sugerencia: 5 minutos');
+
+  // Modal con referencia + CTAs
+  showModal(
+    '<h3>Recordatorio</h3>' +
+    '<div class="notice">' +
+      'Tu cerebro lo evitó <b>' + days + '</b> día(s).Elegí 1 acción.<br/>' +
+      '<b>' + safeEscape(k.title || 'Nudo') + '</b><br/>' +
+      '<span class="hint">Motivo: ' + safeEscape(safeReason(k)) + ' · Último toque: ' + safeEscape(safeTimeAgo(lastTouch)) + '</span><br/>' +
+      safeScoreBadge(score) + ' <span class="kbd">' + safeEscape(hint) + '</span>' +
+    '</div>' +
+    '<div class="row" style="margin-top:10px;">' +
+      '<button id="nudge-view" class="btn">Ver</button>' +
+      '<button id="nudge-5" class="btn btn-primary">⏱ Hacer 5 min</button>' +
+      '<button id="nudge-split" class="btn">🧩 Dividir</button>' +
+      '<button id="nudge-someday" class="btn">Mandar a ALGÚN DÍA</button>' + (k.nextStep ? ('<div class="hint">Próximo paso: <b>' + safeEscape(k.nextStep) + '</b></div>') : '')
+
+    '</div>',
+    { showClose: true }
+  );
+
+  // wiring
+  var btnView = document.getElementById('nudge-view');
+  if (btnView) btnView.onclick = function () {
+    hideModal();
+    showSection('section-today');
+    renderToday();
+    if (typeof showKnotDetail === 'function') showKnotDetail(k.id);
+  };
+
+  var btn5 = document.getElementById('nudge-5');
+  if (btn5) btn5.onclick = function () {
+    hideModal();
+    try {
+      // Si no hay DOING, lo pasamos a DOING
+      if (k.status !== 'DOING') {
+        // puede fallar si ya hay DOING; en ese caso, igual arrancamos 5min del DOING actual
+        transitionToDoing(k.id);
+      }
+    } catch (_) {}
+
+    renderToday();
+
+    // arranca timer + modal foco si existen
+    if (typeof startFiveMin === 'function') startFiveMin(k.id);
+    if (typeof showFocus5MinModal === 'function') showFocus5MinModal(k.id);
+  };
+
+  var btnSplit = document.getElementById('nudge-split');
+  if (btnSplit) btnSplit.onclick = function () {
+    hideModal();
+    showSection('section-today');
+    renderToday();
+    if (typeof showSplitKnotModal === 'function') showSplitKnotModal(k.id);
+  };
+
+  var btnSomeday = document.getElementById('nudge-someday');
+  if (btnSomeday) btnSomeday.onclick = function () {
+    hideModal();
+    transitionToSomeday(k.id);
+    renderToday();
+  };
+
+  // log
+  logEvent('NUDGE_SHOWN', { reason: 'UNLOCKABLE_STALE_48H', knotId: k.id });
 }
+
 
 function handleCaptureClick() {
   var result = canCaptureNewKnot();
