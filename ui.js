@@ -155,6 +155,17 @@ function startFiveMin(knotId) {
   syncTimerChip();
   logEvent('TIMER_5MIN_START', { knotId: knotId });
 }
+function stopFiveMin(reason) {
+  try { clearInterval(__timerState.intervalId); } catch (_) {}
+
+  __timerState.running = false;
+  __timerState.knotId = null;
+  __timerState.endAt = 0;
+  __timerState.intervalId = null;
+
+  syncTimerChip(); // esto lo oculta
+  logEvent('TIMER_5MIN_STOP', { reason: reason || 'STOP' });
+}
 
 /***********************
  * Helpers de botones
@@ -258,8 +269,17 @@ function createKnotCard(knot) {
         showFocus5MinModal(knot.id);
       })
     );
-    actions.appendChild(makeBtn('Pausar', 'small', (e) => { e.stopPropagation(); handlePauseDoing(knot.id); }));
-    actions.appendChild(makeBtn('Marcar HECHO', 'small btn-primary', (e) => { e.stopPropagation(); handleDone(knot.id); }));
+    actions.appendChild(makeBtn('Pausar', 'small', (e) => {
+  e.stopPropagation();
+  stopFiveMin('PAUSE_FROM_CARD');
+  handlePauseDoing(knot.id);
+}));
+    actions.appendChild(makeBtn('Marcar HECHO', 'small btn-primary', (e) => {
+  e.stopPropagation();
+  stopFiveMin('DONE_FROM_CARD');
+  handleDone(knot.id);
+}));
+
   } else if (knot.status === 'UNLOCKABLE') {
     actions.appendChild(makeBtn('Iniciar', 'small', (e) => { e.stopPropagation(); handleStartDoing(knot.id); }));
     actions.appendChild(makeBtn('Mandar a ALGÚN DÍA', 'small', (e) => { e.stopPropagation(); transitionToSomeday(knot.id); renderToday(); }));
@@ -968,14 +988,17 @@ function showFocus5MinModal(knotId) {
   showModal(content, { showClose: false });
 
   document.getElementById('focus-done').onclick = () => {
-    hideModal();
-    showAfter5MinModal(knotId);
-  };
+  stopFiveMin('FOCUS_DONE_CLICK');
+  hideModal();
+  showAfter5MinModal(knotId);
+};
 
-  document.getElementById('focus-pause').onclick = () => {
-    hideModal();
-    handlePauseDoing(knotId);
-  };
+document.getElementById('focus-pause').onclick = () => {
+  stopFiveMin('FOCUS_PAUSE_CLICK');
+  hideModal();
+  handlePauseDoing(knotId);
+};
+
 
   const timerEl = document.getElementById('focus-timer');
   timerEl.className = 'focus-timer timer-green';
@@ -1036,20 +1059,24 @@ function showAfter5MinModal(knotId) {
   showModal(content, { showClose: false });
 
   document.getElementById('a-repeat').onclick = () => {
-    hideModal();
-    startFiveMin(knotId);
-    showFocus5MinModal(knotId);
-  };
+  stopFiveMin('AFTER_REPEAT');
+  hideModal();
+  startFiveMin(knotId);
+  showFocus5MinModal(knotId);
+};
 
-  document.getElementById('a-pause').onclick = () => {
-    hideModal();
-    handlePauseDoing(knotId);
-  };
+document.getElementById('a-pause').onclick = () => {
+  stopFiveMin('AFTER_PAUSE');
+  hideModal();
+  handlePauseDoing(knotId);
+};
 
-  document.getElementById('a-done').onclick = () => {
-    hideModal();
-    handleDone(knotId);
-  };
+document.getElementById('a-done').onclick = () => {
+  stopFiveMin('AFTER_DONE');
+  hideModal();
+  handleDone(knotId);
+};
+
 }
 
 // Init UI
