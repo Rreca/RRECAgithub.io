@@ -17,10 +17,8 @@ function canCaptureNewKnot() {
   var unlockableCount = unlockables.length;
   var hasDoing = knots.some(function(k) { return k.status === 'DOING'; });
 
-  // Regla base
   var baseCanCapture = unlockableCount < 3 && !hasDoing;
 
-  // Upgrade: anti-acumulación 24h
   var now = Date.now();
   var stale24h = false;
 
@@ -45,7 +43,6 @@ function validateNewKnot(knot) {
     throw new Error('Título y motivo de bloqueo requeridos.');
   }
 
-  // Compat: fricción se guarda en weight
   knot.weight = normalizeFriction(knot.weight);
   knot.impact = normalizeImpact(knot.impact);
 
@@ -103,7 +100,7 @@ function transitionToPauseDoing(knotId) {
 function transitionToDone(knotId, feltLighter) {
   var knot = getKnotById(knotId);
   if (!knot) throw new Error('Nudo no encontrado.');
-  updateKnot({ id: knotId, status: 'DONE' });
+  updateKnot({ id: knotId, status: 'DONE', doneAt: Date.now() });
   logEvent('KNOT_DONE', { knotId: knotId, feltLighter: !!feltLighter });
 }
 
@@ -130,8 +127,8 @@ function validateEditedKnot(candidate) {
   }
 
   candidate.estMinutes = candidate.estMinutes ? parseInt(candidate.estMinutes, 10) : null;
-  candidate.weight = normalizeFriction(candidate.weight); // fricción
-  candidate.impact = normalizeImpact(candidate.impact);   // impacto
+  candidate.weight = normalizeFriction(candidate.weight);
+  candidate.impact = normalizeImpact(candidate.impact);
 
   if (['NO_START', 'LAZINESS', 'FEAR'].includes(candidate.blockReason)) {
     if (!candidate.nextStep || candidate.nextStep.trim().length === 0) {

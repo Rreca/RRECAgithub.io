@@ -6,12 +6,47 @@ var STORAGE_KEYS = {
   events: 'nudos_v1_events'
 };
 
+var DONE_RETENTION_DAYS = 7;
+
 function initStore() {
   if (!localStorage.getItem(STORAGE_KEYS.knots)) {
     localStorage.setItem(STORAGE_KEYS.knots, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.events)) {
     localStorage.setItem(STORAGE_KEYS.events, JSON.stringify([]));
+  }
+
+  // mantenimiento: limpiar HECHOS viejos
+  cleanupDoneKnots();
+}
+
+function cleanupDoneKnots() {
+  var knots = getKnots();
+  var now = Date.now();
+  var keepMs = DONE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+  var changed = false;
+
+  knots = knots.filter(function(k) {
+    if (k.status !== 'DONE') return true;
+
+    // compat: si no tiene doneAt, lo inferimos
+    if (!k.doneAt) {
+      k.doneAt = k.updatedAt || k.lastTouchedAt || k.createdAt || now;
+      changed = true;
+    }
+
+    var age = now - k.doneAt;
+    if (age > keepMs) {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+
+  if (changed) {
+    saveKnots(knots);
+    logEvent('DONE_CLEANUP', { keptDays: DONE_RETENTION_DAYS });
   }
 }
 
@@ -36,9 +71,8 @@ function getKnotById(id) {
 }
 
 function createKnot(knot) {
-  // Normalización mínima
-  if (typeof knot.weight !== 'number') knot.weight = parseInt(knot.weight, 10) || 3; // fricción
-  if (typeof knot.impact !== 'number') knot.impact = parseInt(knot.impact, 10) || 3; // impacto
+  if (typeof knot.weight !== 'number') knot.weight = parseInt(knot.weight, 10) || 3;
+  if (typeof knot.impact !== 'number') knot.impact = parseInt(knot.impact, 10) || 3;
 
   var knots = getKnots();
   knots.push(knot);
@@ -52,8 +86,6 @@ function updateKnot(patch) {
   if (idx === -1) return;
 
   var current = knots[idx];
-
-  // Si vienen strings desde inputs, normalizamos
   var next = Object.assign({}, current, patch);
 
   if (typeof next.weight !== 'number') next.weight = parseInt(next.weight, 10) || current.weight || 3;

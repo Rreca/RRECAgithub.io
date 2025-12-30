@@ -2,24 +2,19 @@
 // Bootstrap + navegación + wiring de botones globales
 
 document.addEventListener('DOMContentLoaded', function () {
-  // Store
   initStore();
 
-  // UI state (por si ui.js todavía no lo hace)
   try {
     if (typeof setQuickEditHidden === 'function' && typeof isQuickEditHidden === 'function') {
       setQuickEditHidden(isQuickEditHidden());
     }
   } catch (_) {}
 
-  // Nudge de 48h
   checkNudgeOnLoad();
 
-  // Render inicial
   renderToday();
   updateCaptureButton();
 
-  // Navegación
   var btnToday = document.getElementById('nav-today');
   var btnInsights = document.getElementById('nav-insights');
 
@@ -37,13 +32,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Captura
   var btnCapture = document.getElementById('btn-capture');
-  if (btnCapture) {
-    btnCapture.addEventListener('click', handleCaptureClick);
-  }
+  if (btnCapture) btnCapture.addEventListener('click', handleCaptureClick);
 
-  // Export / Import
   var btnExport = document.getElementById('btn-export');
   if (btnExport) btnExport.addEventListener('click', exportData);
 
@@ -57,23 +48,13 @@ document.addEventListener('DOMContentLoaded', function () {
   var inputImport = document.getElementById('input-import');
   if (inputImport) inputImport.addEventListener('change', importData);
 
-  // Botones modo
-  var btnSoft = document.getElementById('btn-soft');   // 🛡️ Avanzar sin sufrir
-  var btnPanic = document.getElementById('btn-panic'); // 🧨 No quiero pensar
+  var btnSoft = document.getElementById('btn-soft');
+  var btnPanic = document.getElementById('btn-panic');
 
-  if (btnSoft && typeof pickSoftTask === 'function') {
-    btnSoft.addEventListener('click', function () {
-      pickSoftTask();
-    });
-  }
+  if (btnSoft && typeof pickSoftTask === 'function') btnSoft.addEventListener('click', pickSoftTask);
+  if (btnPanic && typeof panicNoThink === 'function') btnPanic.addEventListener('click', panicNoThink);
 
-  if (btnPanic && typeof panicNoThink === 'function') {
-    btnPanic.addEventListener('click', function () {
-      panicNoThink();
-    });
-  }
-
-  // Toggle sliders mini (edición rápida)
+  // ✅ Toggle sliders mini
   var btnQuickToggle = document.getElementById('btn-quick-toggle');
   if (btnQuickToggle && typeof setQuickEditHidden === 'function' && typeof isQuickEditHidden === 'function') {
     btnQuickToggle.addEventListener('click', function () {
@@ -82,27 +63,21 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Filtros backlog (si no los maneja ui.js)
+  // filtros backlog
   var fFriction = document.getElementById('filter-friction');
   var fImpact = document.getElementById('filter-impact');
   var fRecent = document.getElementById('filter-recent');
 
-  if (fFriction) {
-    fFriction.addEventListener('click', function () {
-      if (typeof backlogSortMode !== 'undefined') backlogSortMode = 'friction';
-      renderToday();
-    });
-  }
-  if (fImpact) {
-    fImpact.addEventListener('click', function () {
-      if (typeof backlogSortMode !== 'undefined') backlogSortMode = 'impact';
-      renderToday();
-    });
-  }
-  if (fRecent) {
-    fRecent.addEventListener('click', function () {
-      if (typeof backlogSortMode !== 'undefined') backlogSortMode = 'recent';
-      renderToday();
+  if (fFriction) fFriction.addEventListener('click', function () { backlogSortMode = 'friction'; renderToday(); });
+  if (fImpact) fImpact.addEventListener('click', function () { backlogSortMode = 'impact'; renderToday(); });
+  if (fRecent) fRecent.addEventListener('click', function () { backlogSortMode = 'recent'; renderToday(); });
+
+  // ✅ Cerrar panel detalle
+  var closeBtn = document.getElementById('knot-detail-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function () {
+      var detail = document.getElementById('knot-detail');
+      if (detail) detail.style.display = 'none';
     });
   }
 });
@@ -137,7 +112,6 @@ function checkNudgeOnLoad() {
 function handleCaptureClick() {
   var result = canCaptureNewKnot();
   if (!result.canCapture) {
-    // Si existe modal de sistema lleno, úsalo; si no, fallback
     if (typeof showSystemFullModal === 'function') showSystemFullModal(result.message);
     else showModal('<div class="notice">' + escapeHTML(result.message) + '</div>');
     logEvent('NUDGE_SHOWN', { reason: 'CAPTURE_BLOCKED_SYSTEM_FULL' });
