@@ -23,6 +23,83 @@ function setQuickEditHidden(hidden) {
 }
 
 /***********************
+ * Meta mínima diaria (configurable)
+ ***********************/
+const GOAL_KEYS = {
+	dailyGoal: 'nudos_ui_daily_goal_v1',
+  dailyMinDone: 'nudos_goal_daily_min_done_v1'
+};
+
+function getDailyGoal() {
+  const v = parseInt(localStorage.getItem(GOAL_KEYS.dailyMinDone), 10);
+  return Number.isFinite(v) && v >= 1 && v <= 20 ? v : 1; // default 1
+}
+
+function setDailyGoal(n) {
+  const v = Math.max(1, Math.min(20, parseInt(n, 10) || 1));
+  localStorage.setItem(GOAL_KEYS.dailyMinDone, String(v));
+  return v;
+}
+
+function startOfTodayTs() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  return d.getTime();
+}
+
+function countDoneToday() {
+  const knots = getKnots();
+  const start = startOfTodayTs();
+  const end = start + 24*60*60*1000;
+
+  let c = 0;
+  knots.forEach(k => {
+    if (k.status !== 'DONE') return;
+    const ts = k.doneAt || k.updatedAt || k.lastTouchedAt || k.createdAt || 0;
+    if (ts >= start && ts < end) c++;
+  });
+  return c;
+}
+
+function renderDailyGoalPanel() {
+  const goal = getDailyGoal();
+  const doneToday = countDoneToday();
+  const missing = Math.max(0, goal - doneToday);
+
+  const cls = missing > 0 ? 'goal-warn' : 'goal-ok';
+  const icon = missing > 0 ? '🟡' : '🟢';
+  const msg = missing > 0
+    ? `Te faltan <b>${missing}</b> HECHO(s) hoy para tu mínimo. Hacé 1 micro-cosa de 5 min.`
+    : `Mínimo cumplido. No negocies la cadena.`;
+
+  return `
+    <div class="panel">
+      <h3>Meta mínima diaria</h3>
+
+      <div class="notice ${missing > 0 ? '' : ''}">
+        ${icon} Hoy: <b>${doneToday}</b> hecho(s). Meta: <b>${goal}</b>.
+        <div class="hint">${msg}</div>
+      </div>
+
+      <div class="goal-row">
+        <span class="goal-pill ${cls}">
+          Meta:
+          <input id="daily-goal-input" type="number" min="1" max="20" value="${goal}" />
+          <span class="hint">(1–20)</span>
+        </span>
+
+        <button id="daily-goal-save" class="btn small btn-primary">Guardar meta</button>
+        <button id="daily-goal-one" class="btn small">Poner en 1</button>
+      </div>
+
+      <div class="hint" style="margin-top:8px;">
+        Regla 0,01%: la meta mínima no se discute. Aunque sea “una pavada hecha”.
+      </div>
+    </div>
+  `;
+}
+
+/***********************
  * Diccionarios
  ***********************/
 const STATUS_ES = {
@@ -107,7 +184,10 @@ function showModal(contentHtml, opts) {
 
 function hideModal() {
   document.getElementById('modal-overlay').style.display = 'none';
+  // al cerrar modal, re-sync del chip
+  syncTimerChip();
 }
+
 
 /***********************
  * Timer 5 min + chip + muestra próximo paso
@@ -118,14 +198,18 @@ function syncTimerChip() {
   const chip = document.getElementById('timer-chip');
   if (!chip) return;
 
+  // Regla: el chip SOLO se muestra si el timer está corriendo
   if (!__timerState.running) {
     chip.style.display = 'none';
+    chip.onclick = null;
     return;
   }
 
   const left = Math.max(0, __timerState.endAt - Date.now());
-  const m = String(Math.floor(left / 60000)).padStart(2, '0');
-  const s = String(Math.floor((left % 60000) / 1000)).padStart(2, '0');
+  const totalSeconds = Math.ceil(left / 1000);
+
+  const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const s = String(totalSeconds % 60).padStart(2, '0');
 
   const knot = getKnotById(__timerState.knotId);
   const title = knot ? knot.title : 'Nudo';
@@ -134,14 +218,9 @@ function syncTimerChip() {
   chip.style.display = 'inline-block';
   chip.textContent = `⏱ ${m}:${s} · ${title}${step ? ' · ' + step : ''}`;
 
-  if (left <= 0) {
-    clearInterval(__timerState.intervalId);
-    __timerState.running = false;
-    __timerState.knotId = null;
-    __timerState.endAt = 0;
-    __timerState.intervalId = null;
-    chip.textContent = '⏱ pausa · repetí';
-    chip.style.display = 'inline-block';
+  // Si llegó a 0: detener + ocultar (NO dejarlo visible)
+  if (totalSeconds <= 0) {
+    stopFiveMin('TIMER_FINISHED');
   }
 }
 
@@ -427,6 +506,20 @@ function renderToday() {
   }
 
   if (typeof updateCaptureButton === 'function') updateCaptureButton();
+    // Alerta suave en "Hoy" si meta diaria no cumplida
+  try {
+    const goal = getDailyGoal();
+    const doneToday = countDoneToday();
+    const marquee = document.querySelector('#section-today .marquee span');
+    if (marquee) {
+      if (doneToday < goal) {
+        marquee.textContent = `👉 HOY: faltan ${goal - doneToday} HECHO(s) para tu mínimo · elegí 1 desbloqueable · hacé 5 min · cerrá o pausá · repetí`;
+      } else {
+        marquee.textContent = `👉 HOY: mínimo cumplido · mantené la cadena · elegí 1 desbloqueable · hacé 5 min · cerrá o pausá · repetí`;
+      }
+    }
+  } catch (_) {}
+
   syncTimerChip();
 }
 
@@ -924,12 +1017,8 @@ function panicNoThink() {
   pickSoftTask();
 }
 
-/***********************
- * Insights (igual que tuyo, sin tocar)
- ***********************/
 function renderInsights() {
   const knots = getKnots();
-  const events = getEvents();
 
   const counts = {};
   ['BLOCKED', 'UNLOCKABLE', 'DOING', 'DONE', 'SOMEDAY'].forEach(function (status) {
@@ -943,12 +1032,48 @@ function renderInsights() {
     return `<div>${escapeHTML(statusToEs(k))}: <b>${escapeHTML(String(counts[k]))}</b></div>`;
   }).join('');
 
+  const days = getDoneByDayLast7Days();
+  const momentumHtml = renderMomentumBars(days);
+  const goalHtml = renderDailyGoalPanel();
+
   container.innerHTML =
     `<div class="panel">
       <h3>Conteos por estado</h3>
       ${countsHtml}
-    </div>`;
+    </div>
+    ${goalHtml}
+    ${momentumHtml}`;
+
+  // wiring botones meta
+  const inp = document.getElementById('daily-goal-input');
+  const save = document.getElementById('daily-goal-save');
+  const one = document.getElementById('daily-goal-one');
+
+  if (save && inp) {
+    save.onclick = () => {
+      setDailyGoal(inp.value);
+      renderInsights();
+    };
+  }
+  if (one) {
+    one.onclick = () => {
+      setDailyGoal(1);
+      renderInsights();
+    };
+  }
+
 }
+// ====== 0,01%: alternativas para "Cerrar meta" (top 3) ======
+let __goalAltState = {
+  baseId: null,
+  options: [] // [{id,title}]
+};
+
+function clearGoalAlt() {
+  __goalAltState.baseId = null;
+  __goalAltState.options = [];
+}
+
 
 /***********************
  * 5 minutos (tu versión, intacta)
@@ -958,6 +1083,23 @@ function showFocus5MinModal(knotId) {
   if (!knot) return;
 
   const step = knot.nextStep || 'Hacé cualquier avance mínimo';
+
+  // ===== 0,01%: alternativas para cambiar sin fricción =====
+  let altHtml = '';
+  if (__goalAltState.baseId === knotId && __goalAltState.options.length) {
+    altHtml = `
+      <div class="notice">
+        ¿No era este? Cambiar a:
+        <div class="row" style="margin-top:8px;">
+          ${__goalAltState.options.map((o, i) => `
+            <button class="btn small" id="goal-alt-${i}">➡️ ${escapeHTML(o.title)}</button>
+          `).join('')}
+        </div>
+        <div class="hint">Cambia el foco y reinicia el timer (sin castigo).</div>
+      </div>
+    `;
+  }
+
 
   const content = `
     <h3>⏱ 5 minutos</h3>
@@ -972,7 +1114,9 @@ function showFocus5MinModal(knotId) {
       <b>${escapeHTML(step)}</b>
     </div>
 
+        ${altHtml}
     <div id="focus-timer" class="focus-timer">05:00</div>
+
 
     <div class="hint">
       No pienses. No optimices. <br>
@@ -986,7 +1130,39 @@ function showFocus5MinModal(knotId) {
   `;
 
   showModal(content, { showClose: false });
+    // Handlers: cambiar a alternativa (reinicia timer y mueve estados)
+  if (__goalAltState.baseId === knotId && __goalAltState.options.length) {
+    __goalAltState.options.forEach((o, i) => {
+      const b = document.getElementById(`goal-alt-${i}`);
+      if (!b) return;
+      b.onclick = () => {
+        // 1) parar timer actual
+        stopFiveMin('GOAL_SWITCH');
 
+        // 2) pausar el DOING actual (vuelve a UNLOCKABLE) si aplica
+        try { handlePauseDoing(knotId); } catch (_) {}
+
+        // 3) arrancar el nuevo (puede ser UNLOCKABLE o SOMEDAY)
+        hideModal();
+        clearGoalAlt();
+
+        try {
+          const target = ensureRunnableKnot(getKnotById(o.id));
+          renderToday();
+          startFiveMin(target.id);
+          showFocus5MinModal(target.id);
+          logEvent('GOAL_SWITCHED', { from: knotId, to: target.id });
+        } catch (err) {
+          showModal(`<h3>No se puede cambiar</h3><div class="notice">${escapeHTML(err.message)}</div>`);
+        }
+      };
+    });
+  }
+
+
+// Ocultar chip mientras el modal está abierto (modo foco)
+const chip = document.getElementById('timer-chip');
+if (chip) chip.style.display = 'none';
   document.getElementById('focus-done').onclick = () => {
   stopFiveMin('FOCUS_DONE_CLICK');
   hideModal();
@@ -1083,3 +1259,588 @@ document.getElementById('a-done').onclick = () => {
 document.addEventListener('DOMContentLoaded', function () {
   setQuickEditHidden(isQuickEditHidden());
 });
+function getDoneByDayLast7Days() {
+  const knots = getKnots();
+  const now = new Date();
+  const days = [];
+
+  // arma últimos 7 días (incluyendo hoy)
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const key = dayKey(d.getTime()); // ya la tenés
+    days.push({ key, date: d, count: 0 });
+  }
+
+  const map = {};
+  days.forEach(x => map[x.key] = x);
+
+  knots
+    .filter(k => k.status === 'DONE')
+    .forEach(k => {
+      const ts = k.doneAt || k.updatedAt || k.lastTouchedAt || k.createdAt;
+      if (!ts) return;
+      const key = dayKey(ts);
+      if (map[key]) map[key].count++;
+    });
+
+  return days;
+}
+
+function renderMomentumBars(days) {
+  const max = Math.max(1, ...days.map(d => d.count));
+  const bars = days.map(d => {
+    const w = Math.round((d.count / max) * 100);
+    const label = d.date.toLocaleDateString('es-AR', { weekday: 'short' });
+    return `
+      <div style="display:grid; grid-template-columns: 60px 1fr 30px; gap:10px; align-items:center; margin:6px 0;">
+        <div class="hint">${escapeHTML(label)}</div>
+        <div style="height:14px; border-radius:999px; background:#eee; overflow:hidden;">
+          <div style="height:100%; width:${w}%; background:#0b5ed7;"></div>
+        </div>
+        <div class="hint" style="text-align:right;"><b>${d.count}</b></div>
+      </div>
+    `;
+  }).join('');
+
+  const streak = (() => {
+    // racha: días consecutivos (desde hoy hacia atrás) con count>0
+    let r = 0;
+    for (let i = days.length - 1; i >= 0; i--) {
+      if (days[i].count > 0) r++;
+      else break;
+    }
+    return r;
+  })();
+
+  return `
+    <div class="panel">
+      <h3>Momentum (últimos 7 días)</h3>
+      <div class="notice">
+        Racha actual: <b>${streak}</b> día(s). Objetivo: <b>no cortar</b>.
+      </div>
+      ${bars}
+      <div class="hint">Regla 0,01%: 1 HECHO por día = identidad nueva. No perfección.</div>
+    </div>
+  `;
+}
+/***********************
+ * META DIARIA (0,01%) + BOTÓN "CERRAR META"
+ ***********************/
+// const GOAL_KEYS = {
+  // dailyGoal: 'nudos_ui_daily_goal_v1'
+// };
+
+function getDailyGoal() {
+  const v = parseInt(localStorage.getItem(GOAL_KEYS.dailyGoal), 10);
+  return Number.isFinite(v) && v > 0 ? v : 1; // default 1 hecho/día
+}
+
+function setDailyGoal(n) {
+  const v = parseInt(n, 10);
+  localStorage.setItem(GOAL_KEYS.dailyGoal, String((Number.isFinite(v) && v > 0) ? v : 1));
+}
+
+function isSameLocalDay(tsA, tsB) {
+  const a = new Date(tsA);
+  const b = new Date(tsB);
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth() === b.getMonth() &&
+         a.getDate() === b.getDate();
+}
+
+function countDoneToday() {
+  const now = Date.now();
+  const knots = getKnots();
+  return knots.filter(k => k.status === 'DONE' && k.doneAt && isSameLocalDay(k.doneAt, now)).length;
+}
+
+function updateGoalChip() {
+  const chip = document.getElementById('goal-chip');
+  if (!chip) return;
+
+  const goal = getDailyGoal();
+  const done = countDoneToday();
+
+  chip.textContent = `Meta: ${done}/${goal} hecho(s) hoy`;
+
+  // si cumplió, lo marcamos “done”
+  chip.className = 'badge ' + (done >= goal ? 'done' : 'doing');
+
+  // opcional: ocultar botón si ya cumpliste
+  const btn = document.getElementById('btn-close-goal');
+  if (btn) btn.style.display = (done >= goal) ? 'none' : 'inline-block';
+}
+
+/** Orden 0,01%: friction ASC, impact DESC, lastTouchedAt ASC */
+function compareEasy(a, b) {
+  const fa = getFriction(a), fb = getFriction(b);
+  if (fa !== fb) return fa - fb;
+
+  const ia = getImpact(a), ib = getImpact(b);
+  if (ia !== ib) return ib - ia;
+
+  const ta = (a.lastTouchedAt || a.createdAt || 0);
+  const tb = (b.lastTouchedAt || b.createdAt || 0);
+  return ta - tb;
+}
+
+/**
+ * Elige el mejor candidato para "cerrar meta" en 1 click
+ * prioridad:
+ * 1) DOING actual
+ * 2) UNLOCKABLE más fácil
+ * 3) SOMEDAY fácil -> convertir a UNLOCKABLE (si hay cupo)
+ */
+function pickCloseGoalCandidate() {
+  const knots = getKnots();
+
+  const doing = knots.find(k => k.status === 'DOING');
+  if (doing) return { type: 'DOING', knot: doing };
+
+  const unlockables = knots.filter(k => k.status === 'UNLOCKABLE').sort(compareEasy);
+  if (unlockables.length) return { type: 'UNLOCKABLE', knot: unlockables[0] };
+
+  const someday = knots.filter(k => k.status === 'SOMEDAY').sort(compareEasy);
+  if (someday.length) return { type: 'SOMEDAY', knot: someday[0] };
+
+  return { type: 'NONE', knot: null };
+}
+function pickTopCandidates(limit) {
+  const knots = getKnots();
+  const out = [];
+
+  // 1) DOING si existe
+  const doing = knots.find(k => k.status === 'DOING');
+  if (doing) out.push(doing);
+
+  // 2) UNLOCKABLEs fáciles
+  const unlockables = knots.filter(k => k.status === 'UNLOCKABLE').sort(compareEasy);
+  unlockables.forEach(k => { if (!out.some(x => x.id === k.id)) out.push(k); });
+
+  // 3) SOMEDAYs fáciles (para convertir si hace falta)
+  const someday = knots.filter(k => k.status === 'SOMEDAY').sort(compareEasy);
+  someday.forEach(k => { if (!out.some(x => x.id === k.id)) out.push(k); });
+
+  return out.slice(0, limit || 3);
+}
+
+function ensureRunnableKnot(k) {
+  // Devuelve un knot listo para foco (DOING) o lanza error con mensaje
+  if (!k) throw new Error('Sin candidato.');
+
+  // Si es DOING, ya está
+  if (k.status === 'DOING') return k;
+
+  // Si es UNLOCKABLE -> pasarlo a DOING
+  if (k.status === 'UNLOCKABLE') {
+    transitionToDoing(k.id);
+    return getKnotById(k.id);
+  }
+
+  // Si es SOMEDAY -> convertir a UNLOCKABLE si hay cupo, luego a DOING
+  if (k.status === 'SOMEDAY') {
+    if (!canMoveToUnlockable()) {
+      throw new Error('No hay cupo para convertir SOMEDAY a DESBLOQUEABLE.');
+    }
+    const next = k.nextStep || 'Abrir y hacer 1 paso mínimo';
+    updateKnot({
+      id: k.id,
+      status: 'UNLOCKABLE',
+      blockReason: (k.blockReason === 'NOT_TODAY' ? 'NO_START' : (k.blockReason || 'NO_START')),
+      nextStep: next,
+      estMinutes: k.estMinutes || 5
+    });
+    transitionToDoing(k.id);
+    return getKnotById(k.id);
+  }
+
+  throw new Error('Estado no accionable.');
+}
+
+function closeGoalOneClick() {
+debugger;
+console.log("44444444444444444444444");
+  const goal = getDailyGoal();
+  const done = countDoneToday();
+  if (done >= goal) {
+    showModal(`<h3>Meta cumplida</h3><div class="notice">Ya hiciste ${done}/${goal}. Ganaste hoy.</div>`);
+    return;
+  }
+
+  const top = pickTopCandidates(3);
+  if (!top.length) {
+    showModal(`<h3>Sin candidatos</h3><div class="notice">No hay nudos accionables. Capturá uno chico.</div>`);
+    return;
+  }
+
+  let chosen = null;
+  try {
+    // Elegimos el 1ro, y lo hacemos runnable (puede convertir / mover estados)
+    chosen = ensureRunnableKnot(top[0]);
+  } catch (err) {
+    showModal(`<h3>No se puede cerrar meta</h3><div class="notice">${escapeHTML(err.message)}</div>`);
+    return;
+  }
+
+  // Guardamos alternativas (sin el elegido)
+  __goalAltState.baseId = chosen.id;
+  __goalAltState.options = top
+    .filter(x => x && x.id !== chosen.id)
+    .slice(0, 2)
+    .map(x => ({ id: x.id, title: x.title || 'Nudo' }));
+
+  // Disparo foco (1 click)
+  renderToday();
+  showSection('section-today');
+
+  startFiveMin(chosen.id);
+  showFocus5MinModal(chosen.id);
+
+  logEvent('GOAL_CLOSE_ONE_CLICK', { knotId: chosen.id });
+}
+
+
+/***********************
+ * Hook: wiring botón en DOMContentLoaded
+ ***********************/
+document.addEventListener('DOMContentLoaded', function () {
+  const btn = document.getElementById('btn-close-goal');
+  if (btn) {
+    btn.addEventListener('click', function () {
+      closeGoalOneClick();
+      updateGoalChip();
+    });
+  }
+
+  // refrescar chip al entrar
+  updateGoalChip();
+});
+
+/*************************************************************
+ * UPGRADE: Score “cerca de HECHO” usando SOLO events (sin IA)
+ * Pegar en ui.js (o en un archivo nuevo insights_score.js)
+ *
+ * Qué hace:
+ * 1) Calcula un score por nudo basado en tu historial real:
+ *    - ratio de cierre (DOING->DONE)
+ *    - tiempo típico para cerrar (DOING->DONE)
+ *    - penaliza evitación (pausas / idas a SOMEDAY)
+ * 2) Te da helpers para:
+ *    - rankear backlog o unlockables por “más cerca de HECHO”
+ *    - elegir “HECHO más fácil” y disparar timer 5 min 1 click
+ *************************************************************/
+
+/***********************
+ * 0) Utilidades
+ ***********************/
+function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function safeNum(x, fallback) {
+  var n = Number(x);
+  return Number.isFinite(n) ? n : fallback;
+}
+function median(arr) {
+  if (!arr || !arr.length) return null;
+  var a = arr.slice().sort(function(x,y){return x-y;});
+  var mid = Math.floor(a.length/2);
+  return (a.length % 2) ? a[mid] : (a[mid-1] + a[mid]) / 2;
+}
+function hours(ms){ return ms / (1000*60*60); }
+function days(ms){ return ms / (1000*60*60*24); }
+
+/***********************
+ * 1) Normalizar events a “timeline por knot”
+ *
+ * Tus events tienen:
+ * { knotId, type, createdAt, meta }
+ *
+ * Para inferir cierres necesitamos detectar:
+ * - cuando entró en DOING
+ * - cuando llegó a DONE
+ * - cuántas pausas/evitaciones hubo
+ *
+ * En tu store.js ya logueás:
+ * - STATUS_CHANGED { newStatus }
+ * - KNOT_DONE { feltLighter }
+ *
+ * Así detectamos:
+ * - DOING: STATUS_CHANGED newStatus=DOING
+ * - DONE:  KNOT_DONE o STATUS_CHANGED newStatus=DONE
+ * - PAUSE: TIMER_5MIN_STOP reason ... + STATUS_CHANGED DOING->UNLOCKABLE
+ *
+ ***********************/
+function getKnotEventStream(knotId) {
+  var evs = getEvents()
+    .filter(function(e){ return e && e.knotId === knotId; })
+    .slice()
+    .sort(function(a,b){ return (a.createdAt||0) - (b.createdAt||0); });
+
+  return evs;
+}
+
+/***********************
+ * 2) “Vecindario” (nudos parecidos)
+ * Similaridad simple por (fricción, impacto) en rango ±1
+ ***********************/
+function isSimilarKnot(a, b) {
+  if (!a || !b) return false;
+  var fa = getFriction(a), ia = getImpact(a);
+  var fb = getFriction(b), ib = getImpact(b);
+  return Math.abs(fa - fb) <= 1 && Math.abs(ia - ib) <= 1;
+}
+
+/***********************
+ * 3) Extraer sesiones DOING->DONE desde events
+ *
+ * Para cada knot, detectamos “session start” cuando entra DOING,
+ * y “session end” cuando llega DONE.
+ *
+ * Nota: si hay múltiples entradas a DOING, tomamos pares secuenciales.
+ ***********************/
+function extractDoingDoneDurationsByKnotId(knotId) {
+  var evs = getKnotEventStream(knotId);
+
+  var startAt = null;
+  var durations = [];
+
+  for (var i=0; i<evs.length; i++) {
+    var e = evs[i];
+    var t = e.type;
+    var meta = e.meta || {};
+
+    var isDoing = (t === 'STATUS_CHANGED' && meta.newStatus === 'DOING');
+    var isDone  = (t === 'KNOT_DONE') || (t === 'STATUS_CHANGED' && meta.newStatus === 'DONE');
+
+    if (isDoing) {
+      startAt = e.createdAt || null;
+    }
+
+    if (isDone && startAt) {
+      var endAt = e.createdAt || null;
+      if (endAt && endAt >= startAt) durations.push(endAt - startAt);
+      startAt = null;
+    }
+  }
+
+  return durations; // ms[]
+}
+
+/***********************
+ * 4) Contar evitación / fricción conductual
+ *
+ * Penalizamos:
+ * - veces que pausaste desde DOING (DOING->UNLOCKABLE)
+ * - veces que mandaste a SOMEDAY
+ * - veces que “split” o “no tocaste” no suma acá
+ *
+ * Con tus events:
+ * - STATUS_CHANGED newStatus=UNLOCKABLE (desde DOING) => pauseAvoid++
+ * - STATUS_CHANGED newStatus=SOMEDAY => someday++
+ * - TIMER_5MIN_STOP reason=... => extra (muy leve)
+ ***********************/
+function extractAvoidanceStats(knotId) {
+  var evs = getKnotEventStream(knotId);
+
+  var pauseAvoid = 0;
+  var someday = 0;
+  var timerStops = 0;
+
+  // Para saber si venía de DOING, miramos el status anterior en events:
+  var lastStatus = null;
+
+  for (var i=0; i<evs.length; i++) {
+    var e = evs[i];
+    var t = e.type;
+    var meta = e.meta || {};
+
+    if (t === 'STATUS_CHANGED') {
+      var ns = meta.newStatus || null;
+
+      if (ns === 'UNLOCKABLE' && lastStatus === 'DOING') pauseAvoid++;
+      if (ns === 'SOMEDAY') someday++;
+
+      lastStatus = ns || lastStatus;
+    }
+
+    if (t === 'TIMER_5MIN_STOP') timerStops++;
+  }
+
+  return { pauseAvoid: pauseAvoid, someday: someday, timerStops: timerStops };
+}
+
+/***********************
+ * 5) Métricas globales por “tipo” (vecindario)
+ *
+ * Para un knot objetivo, miramos todos los knots similares y calculamos:
+ * - closeRate = (sesiones que terminan) / (sesiones empezadas)
+ * - typicalHours = mediana de horas de cierre
+ ***********************/
+function computeNeighborhoodStats(targetKnot) {
+  var knots = getKnots();
+  var similar = knots.filter(function(k){ return isSimilarKnot(targetKnot, k); });
+
+  var sessionsStarted = 0;
+  var sessionsClosed = 0;
+  var allDurations = [];
+
+  for (var i=0; i<similar.length; i++) {
+    var k = similar[i];
+    var evs = getKnotEventStream(k.id);
+
+    // sesiones empezadas = veces que entró a DOING
+    var starts = evs.filter(function(e){
+      return e.type === 'STATUS_CHANGED' && (e.meta||{}).newStatus === 'DOING';
+    }).length;
+
+    sessionsStarted += starts;
+
+    // sesiones cerradas = pares DOING->DONE
+    var durs = extractDoingDoneDurationsByKnotId(k.id);
+    sessionsClosed += durs.length;
+    for (var j=0; j<durs.length; j++) allDurations.push(durs[j]);
+  }
+
+  var closeRate = (sessionsStarted > 0) ? (sessionsClosed / sessionsStarted) : 0.25; // prior suave
+  var typicalMs = median(allDurations);
+  var typicalHours = typicalMs != null ? hours(typicalMs) : 24; // si no hay data, asumimos “largo”
+
+  return {
+    similarCount: similar.length,
+    sessionsStarted: sessionsStarted,
+    sessionsClosed: sessionsClosed,
+    closeRate: closeRate,
+    typicalHours: typicalHours
+  };
+}
+
+/***********************
+ * 6) Score “cerca de HECHO” (0..100)
+ *
+ * Componentes:
+ * A) closeRate (0..1)      -> + fuerte
+ * B) typicalHours (0..?)   -> - fuerte (más horas peor)
+ * C) avoidance (pausas / someday / stops) -> - moderado
+ * D) bonus por fricción baja + impacto decente -> + leve
+ *
+ * Resultado:
+ * 0..100, más alto = más cerca de HECHO
+ ***********************/
+function computeCloseScore(knot) {
+  if (!knot) return { score: 0, debug: {} };
+
+  var neigh = computeNeighborhoodStats(knot);
+  var avoid = extractAvoidanceStats(knot.id);
+
+  // A) closeRate: 0..1 => 0..60 pts
+  var closePts = clamp(neigh.closeRate, 0, 1) * 60;
+
+  // B) typicalHours: mapear 0..48h a 30..0 pts (si >48h, casi 0)
+  // (menos tiempo típico => más score)
+  var h = clamp(neigh.typicalHours, 0, 48);
+  var timePts = (1 - (h / 48)) * 30;
+
+  // C) avoidance penalty: hasta 25 pts de castigo
+  // (pausas pesan más que timerStops)
+  var avoidRaw = avoid.pauseAvoid * 3 + avoid.someday * 4 + avoid.timerStops * 0.5;
+  var avoidPts = clamp(avoidRaw, 0, 25);
+
+  // D) bonus simple: fricción baja y/o impacto alto (máx 10)
+  var fr = getFriction(knot);
+  var im = getImpact(knot);
+
+  var bonus = 0;
+  if (fr <= 2) bonus += 6;
+  if (im >= 4) bonus += 4;
+
+  var raw = closePts + timePts + bonus - avoidPts;
+
+  // prior: si no hay nada de data en vecindario, bajamos un poco (evita falsos “top”)
+  if (neigh.sessionsStarted === 0 && neigh.sessionsClosed === 0) raw *= 0.75;
+
+  var score = clamp(Math.round(raw), 0, 100);
+
+  return {
+    score: score,
+    debug: {
+      closeRate: neigh.closeRate,
+      typicalHours: neigh.typicalHours,
+      closePts: closePts,
+      timePts: timePts,
+      bonus: bonus,
+      avoid: avoid,
+      avoidPts: avoidPts,
+      neigh: neigh
+    }
+  };
+}
+
+/***********************
+ * 7) Rankers: elegir candidato “más cerca de HECHO”
+ *
+ * “Backlog” suele ser BLOCKED/SOMEDAY, pero tu feature puede apuntar:
+ * - a UNLOCKABLES (para elegir 1 y convertirlo en DOING)
+ * - o a todo excepto DONE
+ ***********************/
+function rankKnotsByCloseScore(knots) {
+  return (knots || [])
+    .map(function(k){
+      var r = computeCloseScore(k);
+      return { knot: k, score: r.score, debug: r.debug };
+    })
+    .sort(function(a,b){
+      // score desc
+      if (b.score !== a.score) return b.score - a.score;
+
+      // desempate: fricción asc (más fácil)
+      var fa = getFriction(a.knot), fb = getFriction(b.knot);
+      if (fa !== fb) return fa - fb;
+
+      // luego impacto desc
+      var ia = getImpact(a.knot), ib = getImpact(b.knot);
+      return ib - ia;
+    });
+}
+
+/***********************
+ * 8) “Cerrar la meta” 1 click:
+ * - elige el UNLOCKABLE más cerca de HECHO
+ * - lo pasa a DOING si no hay DOING
+ * - dispara startFiveMin + showFocus5MinModal
+ *
+ * Si ya hay DOING: solo dispara timer sobre ese.
+ ***********************/
+function closeGoalOneClickNav() {
+  var knots = getKnots();
+  var doing = knots.find(function(k){ return k.status === 'DOING'; });
+
+  if (doing) {
+    startFiveMin(doing.id);
+    showFocus5MinModal(doing.id);
+    logEvent('CLOSE_GOAL_CLICK', { mode: 'EXISTING_DOING', knotId: doing.id });
+    return;
+  }
+
+  var unlockables = knots.filter(function(k){ return k.status === 'UNLOCKABLE'; });
+  if (!unlockables.length) {
+    showModal('<h3>Cerrar meta</h3><div class="notice">No hay DESBLOQUEABLES. Capturá uno.</div>');
+    return;
+  }
+
+  var ranked = rankKnotsByCloseScore(unlockables);
+  var best = ranked[0].knot;
+
+  try { transitionToDoing(best.id); } catch (_) {}
+  renderToday();
+
+  startFiveMin(best.id);
+  showFocus5MinModal(best.id);
+
+  logEvent('CLOSE_GOAL_CLICK', { mode: 'PICKED_UNLOCKABLE', knotId: best.id, score: ranked[0].score });
+}
+
+/*************************************************************
+ * 9) (Opcional) Mostrar el score en cards (solo si querés)
+ * En createKnotCard(), después del score actual, podés meter:
+ *   const cs = computeCloseScore(knot).score;
+ *   y renderizar: <span class="badge">Cerca HECHO: ${cs}</span>
+ *************************************************************/

@@ -25,12 +25,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  if (btnInsights) {
-    btnInsights.addEventListener('click', function () {
-      showSection('section-insights');
-      renderInsights();
-    });
-  }
+if (btnInsights) {
+  btnInsights.addEventListener('click', function () {
+    showSection('section-insights');
+    renderInsights();
+    if (typeof updateGoalChip === 'function') updateGoalChip();
+  });
+}
 
   var btnCapture = document.getElementById('btn-capture');
   if (btnCapture) btnCapture.addEventListener('click', handleCaptureClick);
@@ -80,6 +81,11 @@ document.addEventListener('DOMContentLoaded', function () {
       if (detail) detail.style.display = 'none';
     });
   }
+  var btnCloseGoalNav = document.getElementById('btn-close-goalNav');
+if (btnCloseGoalNav) btnCloseGoalNav.addEventListener('click', closeGoalOneClickNav);
+var btnCloseGoal = document.getElementById('btn-close-goal');
+if (btnCloseGoal) btnCloseGoal.addEventListener('click', closeGoalOneClick);
+
 });
 
 function showSection(sectionId) {

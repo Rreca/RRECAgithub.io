@@ -488,3 +488,86 @@ body.hide-quick .quick-edit {
   background: #111;
   display: inline-block;
 }
+
+/* ===== Insight: Meta diaria + alerta suave ===== */
+.goal-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.goal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #d7d7d7;
+  background: #fff;
+  font-size: 12px;
+}
+
+.goal-warn {
+  border-color: #ffc107;
+  background: #fff7e0;
+}
+
+.goal-ok {
+  border-color: #198754;
+  background: #e8fff1;
+}
+
+.goal-pill input[type="number"]{
+  width: 70px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+}
+/* Meta diaria */
+#goal-chip {
+  border-color: #0b5ed7;
+  background: #e8f0ff;
+  font-weight: 800;
+}
+.btn-subcopy {
+  font-size: 11px;
+  opacity: 0.65;
+  margin-left: -6px;
+  margin-right: 8px;
+  align-self: center;
+  white-space: nowrap;
+}
+/* Nav: que alinee bien todo */
+.nav{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  justify-content:center;
+  align-items:stretch; /* clave: todos estiran al alto mayor */
+}
+
+/* Botón base: todos mismo alto */
+.btn{
+  height:52px;               /* <-- fijá el alto que quieras */
+  padding: 6px 12px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:10px;
+  white-space:nowrap;
+}
+
+/* Botón con 2 líneas */
+.btn-with-sub{
+  flex-direction:column;     /* 2 líneas vertical */
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  text-align:center;
+}
+
+/* Texto principal y subcopy */
+.btn-main{ line-height:1.1; font-weight:600; }
+.btn-sub { line-height:1.1; font-size:11px; opacity:.7; }
