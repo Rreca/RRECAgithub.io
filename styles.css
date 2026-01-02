@@ -571,3 +571,29 @@ body.hide-quick .quick-edit {
 /* Texto principal y subcopy */
 .btn-main{ line-height:1.1; font-weight:600; }
 .btn-sub { line-height:1.1; font-size:11px; opacity:.7; }
+/* Timer chip HUD */
+#timer-chip.badge {
+  position: fixed;
+  right: 12px;
+  top: 12px;
+  z-index: 9999;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 16px;
+  line-height: 1.2;
+  max-width: min(420px, calc(100vw - 24px));
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  backdrop-filter: blur(6px);
+}
+
+/* Cuando el timer está corriendo, que se vea fuerte */
+#timer-chip.badge.doing {
+  font-weight: 700;
+}
+
+/* El texto dentro del chip: que no se desborde feo */
+#timer-chip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
