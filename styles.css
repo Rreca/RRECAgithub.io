@@ -597,3 +597,216 @@ body.hide-quick .quick-edit {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* =========================
+   PATCH – ARCHIVED + CONTEXT BADGES + ARCHIVED PANEL
+   ========================= */
+
+/* Estado ARCHIVED (badge) */
+.badge.archived {
+  border-color: #6f42c1;
+  background: #f3e8ff;
+  font-weight: 800;
+}
+
+/* Badges de contexto (ctx-*) */
+.badge.ctx-home   { border-color: #198754; background: #e8fff1; font-weight: 700; }
+.badge.ctx-street { border-color: #fd7e14; background: #fff3e6; font-weight: 700; }
+.badge.ctx-work   { border-color: #0b5ed7; background: #e8f0ff; font-weight: 700; }
+.badge.ctx-any    { border-color: #6c757d; background: #f1f3f5; font-weight: 700; }
+
+/* Botón “Mostrar/Ocultar” dentro de panel header (Archivados) */
+.panel h3 {
+  margin-top: 0;
+}
+
+/* Archivados: botones de micro-items */
+#archived-body .btn.small {
+  height: 38px;           /* no uses 52px acá, queda gordo */
+  padding: 6px 10px;
+  border-radius: 12px;
+}
+
+/* Archivados: “chips” clicables en wrap */
+#archived-body .row {
+  gap: 8px;
+}
+
+/* Detalle: select y botones se acomoden mejor en mobile */
+#knot-detail select,
+#knot-detail input {
+  max-width: 100%;
+}
+
+/* Si querés que el panel de Archivados tenga “sensación” de sección distinta */
+#archived-body .panel {
+  background: #fcfbff;
+  border-color: #eadcff;
+}
+
+/* Opcional: que los botones de Restore/Delete en detalle respiren */
+#knot-detail .btn {
+  margin-top: 4px;
+}
+/* =========================
+   ACCORDION PRO – ARCHIVADOS
+   ========================= */
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.accordion-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accordion-caret {
+  font-size: 16px;
+  transition: transform 0.25s ease;
+}
+
+/* cuerpo animado */
+.accordion-body {
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.25s ease;
+  opacity: 1;
+}
+
+.accordion-body.collapsed {
+  max-height: 0 !important;
+  opacity: 0;
+}
+
+/* caret rotado cuando está abierto */
+.accordion-open .accordion-caret {
+  transform: rotate(90deg); /* ▸ -> ▾ */
+}
+
+/* look un poco más fino para archivados */
+.panel-archived {
+  background: #fcfbff;
+  border-color: #eadcff;
+}
+/* Accordion pro – Archivados */
+.accordion-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  cursor:pointer;
+  user-select:none;
+}
+.accordion-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.accordion-caret{
+  font-size:16px;
+  transition:transform .25s ease;
+}
+.accordion-body{
+  overflow:hidden;
+  transition:max-height .35s ease, opacity .25s ease;
+  opacity:1;
+}
+.accordion-body.collapsed{
+  max-height:0 !important;
+  opacity:0;
+}
+.accordion-open .accordion-caret{
+  transform:rotate(90deg);
+}
+
+/* look suave opcional */
+.panel-archived{
+  background:#fcfbff;
+  border-color:#eadcff;
+}
+/* ===== Context switch (segmented control pro) ===== */
+.context-switch{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px;
+  border-radius:999px;
+  background:#f1f3f5;
+  border:1px solid #e2e6ea;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  margin-left: 6px; /* para que respire respecto a Capturar */
+}
+
+/* cada “segmento” */
+.context-btn{
+  appearance:none;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  user-select:none;
+
+  height:40px;
+  padding:0 14px;
+  border-radius:999px;
+
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+
+  font-size:14px;
+  font-weight:700;
+  color:#111;
+
+  transition: transform .06s ease, filter .2s ease, background-color .2s ease, color .2s ease, opacity .2s ease;
+}
+
+.context-btn:hover{ filter: brightness(0.98); }
+.context-btn:active{ transform: translateY(1px); }
+
+/* activo = modo seleccionado */
+.context-btn.active{
+  background:#0b5ed7;
+  color:#fff;
+  box-shadow: 0 8px 20px rgba(11,94,215,0.22);
+}
+
+/* separador antes de ALL */
+.context-divider{
+  width:1px;
+  height:22px;
+  background:#d7d7d7;
+  opacity:.7;
+  margin:0 2px;
+}
+
+/* ALL al final y atenuado */
+.context-btn.context-all{
+  opacity:.55;
+}
+
+/* ALL activo: visible pero no gritón */
+.context-btn.context-all.active{
+  opacity:1;
+  background:#111;
+  color:#fff;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+}
+
+/* responsive opcional */
+@media (max-width: 520px){
+  .context-btn span{ display:none; }
+  .context-btn{ padding:0 12px; }
+}
+.nav{
+  display:flex;
+  flex-wrap:wrap;
+}
+
+.context-switch{
+  flex-basis: 100%;   /* fuerza nueva fila */
+  justify-content: center;
+  margin-top: 8px;
+}

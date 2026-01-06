@@ -40,6 +40,22 @@
         <span class="btn-main">Capturar nudo</span>
         <span class="btn-sub"></span>
       </button>
+	  </br>
+	 <div class="context-switch" id="context-switch">
+  <button type="button" class="context-btn" data-filter="HOME"   title="Casa">🏠 <span>Casa</span></button>
+  <button type="button" class="context-btn" data-filter="STREET" title="Calle">🚶 <span>Calle</span></button>
+  <button type="button" class="context-btn" data-filter="WORK"   title="Trabajo">💼 <span>Trabajo</span></button>
+  <button type="button" class="context-btn" data-filter="ANY"    title="General">🌐 <span>General</span></button>
+
+  <span class="context-divider" aria-hidden="true"></span>
+
+  <button type="button" class="context-btn context-all" data-filter="ALL" title="Ver todo (sin filtro)">
+    🌍 <span>ALL</span>
+  </button>
+</div>
+
+  
+</div>
     </nav>
   </header>
 
@@ -135,6 +151,22 @@
         <input type="file" id="input-import" accept=".json" style="display:none;">
         <button id="btn-import" class="btn">Importar JSON</button>
       </div>
+	  <hr style="margin:20px 0;">
+
+<div class="panel" style="border:2px solid #dc3545; padding:12px;">
+  <h3 style="color:#dc3545;">⚠ Zona peligrosa</h3>
+
+  <div class="notice">
+    Esto borra <b>todos los nudos, metas, contexto, timers y configuración</b>
+    guardados en este navegador.<br>
+    <b>No se puede deshacer.</b>
+  </div>
+
+  <button id="btn-reset-all" class="btn btn-danger">
+    🧨 Reset total (borrar todo)
+  </button>
+</div>
+
     </section>
 
     <aside id="knot-detail" style="display:none;">
