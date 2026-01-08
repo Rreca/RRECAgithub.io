@@ -101,8 +101,8 @@ function applyCloudPayloadToLocal(payload) {
   if (!payload || !Array.isArray(payload.knots)) throw new Error('Payload inválido (knots).');
 
   // ADAPTAR: tu app probablemente persiste con setKnots / saveKnots / etc.
-  if (typeof setKnots === 'function') {
-    setKnots(payload.knots);
+  if (typeof saveKnots === 'function') {
+    saveKnots(payload.knots);
   } else {
     // fallback genérico si tu app usa update/create en storage propio:
     localStorage.setItem('nudos_knots_v1', JSON.stringify(payload.knots));
