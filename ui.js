@@ -785,7 +785,13 @@ function renderToday() {
     .filter(k => k.status === 'DONE')
     .sort((a, b) => (b.doneAt || b.updatedAt || 0) - (a.doneAt || a.updatedAt || 0));
 
-  let backlog = visible.filter(k => ['BLOCKED', 'SOMEDAY'].includes(k.status));
+  let backlog = visible
+  .filter(k => ['BLOCKED', 'SOMEDAY'].includes(k.status))
+  .filter(k => {
+    if (filter === CONTEXT_FILTER.ALL) return true;
+    return getKnotContext(k) === filter;   // ✅ NO deja pasar ANY
+  });
+
 
   if (backlogSortMode === 'friction') backlog.sort((a, b) => getFriction(b) - getFriction(a));
   else if (backlogSortMode === 'impact') backlog.sort((a, b) => getImpact(b) - getImpact(a));
