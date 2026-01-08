@@ -2198,7 +2198,16 @@ function wireContextSwitch() {
 
   paint();
 }
+function wireGist() {
+  const cfg = document.getElementById('btn-gist-config');
+  const load = document.getElementById('btn-cloud-load');
+  const save = document.getElementById('btn-cloud-save');
 
+  if (cfg) cfg.onclick = showGistConfigModal;
+  if (load) load.onclick = handleCloudLoad;
+  if (save) save.onclick = handleCloudSave;
+
+}
 
 /***********************
  * Init UI
@@ -2211,6 +2220,8 @@ document.addEventListener('DOMContentLoaded', function () {
     btnReset.onclick = handleResetAllData;
   }
   wireContextSwitch();
+  wireGist();
+  
 });
 
 /***********************
